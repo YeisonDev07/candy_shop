@@ -39,7 +39,7 @@ export class ProductosController {
     return this.productosService.findOne(id);
   }
 
-  @Patch(':id/restaurar')
+  @Patch('restaurar/:id')
   @HttpCode(HttpStatus.OK)
   async restore(@Param('id', ParseBigIntPipe) id: bigint) {
     return this.productosService.restore(id);
@@ -51,7 +51,14 @@ export class ProductosController {
     return this.productosService.create(crearProductoDto);
   }
 
+  @Post('muchos')
+  @HttpCode(HttpStatus.CREATED)
+  async createMany(@Body() productos: CrearProductoDto[]) {
+    return this.productosService.createMany(productos);
+  }
+
   @Patch(':id')
+  @HttpCode(HttpStatus.OK)
   async update(
     @Param('id', ParseBigIntPipe) id: bigint,
     @Body() actualizarProductoDto: ActualizarProductoDto,
