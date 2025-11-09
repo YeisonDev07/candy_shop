@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE "Producto" (
-    "id" SERIAL NOT NULL,
+    "id" BIGSERIAL NOT NULL,
     "nombre" TEXT NOT NULL,
     "descripcion" TEXT,
     "precio" DOUBLE PRECISION NOT NULL,
