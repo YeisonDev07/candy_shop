@@ -34,6 +34,12 @@ export class ProductosController {
     return this.productosService.findInactivos(pagina, limite, buscar);
   }
 
+  // @Get('test-telegram')
+  // async testTelegram(): Promise<{ message: string }> {
+  //   await this.productosService.testTelegram();
+  //   return { message: 'Mensaje de prueba enviado a Telegram' };
+  // }
+
   @Get(':id')
   async findOne(@Param('id', ParseBigIntPipe) id: bigint) {
     return this.productosService.findOne(id);
@@ -70,5 +76,21 @@ export class ProductosController {
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id', ParseBigIntPipe) id: bigint) {
     return this.productosService.remove(id);
+  }
+
+  @Patch(':id/reducir-stock')
+  async reducirStock(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @Body('cantidad') cantidad: number,
+  ) {
+    return this.productosService.reducirStock(id, cantidad);
+  }
+
+  @Patch(':id/aumentar-stock')
+  async aumentarStock(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @Body('cantidad') cantidad: number,
+  ) {
+    return this.productosService.aumentarStock(id, cantidad);
   }
 }
