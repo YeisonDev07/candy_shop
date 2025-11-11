@@ -127,7 +127,9 @@ export class ProductosService {
     }
   }
 
-  async createMany(productos: CrearProductoDto[]): Promise<{ message: string; total: number }> {
+  async createMany(
+    productos: CrearProductoDto[],
+  ): Promise<{ message: string; total: number }> {
     if (!Array.isArray(productos) || productos.length === 0) {
       throw new BadRequestException('Debes enviar al menos un producto.');
     }
