@@ -8,11 +8,13 @@ datasource db {
 }
 
 model Producto {
-  id            BigInt   @id @default(autoincrement())
+  id            BigInt      @id @default(autoincrement())
   nombre        String
   descripcion   String?
   precio        Float
-  activo        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  activo        Boolean     @default(true)
+  stock         Int         @default(0)
+  stockMinimo   Int         @default(5)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }

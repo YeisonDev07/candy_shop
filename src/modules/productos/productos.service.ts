@@ -33,7 +33,7 @@ export class ProductosService {
     pagina: number = 1,
     limite: number = 10,
     buscar?: string,
-  ): Promise<PaginacionResultado<SerializedProducto>> {
+  ): Promise<PaginacionResultado<SerializedProducto> | { message: string }> {
     const maxPageSize = this.configService.get<number>('MAX_PAGE_SIZE', 50);
 
     const normalize = (val: number, min: number, max: number) =>
@@ -66,14 +66,23 @@ export class ProductosService {
       this.prisma.producto.count({ where }),
     ]);
 
+    // ✅ VALIDACIÓN: Si no hay productos
+    if (total === 0) {
+      return {
+        message: buscar
+          ? `No se encontraron productos que coincidan con "${buscar}"`
+          : 'No hay productos disponibles en este momento',
+      };
+    }
+
     const serializedProductos = serializedBigInt(
       productos,
     ) as SerializedProducto[];
 
     return {
       total,
-      pagina: page,
       limite: limit,
+      pagina: page,
       totalPaginas: Math.ceil(total / limit),
       datos: serializedProductos,
     } satisfies PaginacionResultado<SerializedProducto>;
@@ -118,6 +127,59 @@ export class ProductosService {
     }
   }
 
+  async createMany(
+    productos: CrearProductoDto[],
+  ): Promise<{ message: string; total: number }> {
+    if (!Array.isArray(productos) || productos.length === 0) {
+      throw new BadRequestException('Debes enviar al menos un producto.');
+    }
+
+    // ✅ VALIDACIÓN: Límite máximo de productos por batch
+    const MAX_BATCH_SIZE = 100;
+    if (productos.length > MAX_BATCH_SIZE) {
+      throw new BadRequestException(
+        `No puedes crear más de ${MAX_BATCH_SIZE} productos a la vez. Enviaste ${productos.length}.`,
+      );
+    }
+
+    // ✅ VALIDACIÓN: Verificar duplicados dentro del mismo array
+    const nombres = productos.map((p) => p.nombre);
+    const nombresDuplicados = nombres.filter(
+      (nombre, index) => nombres.indexOf(nombre) !== index,
+    );
+    if (nombresDuplicados.length > 0) {
+      throw new BadRequestException(
+        `Hay nombres duplicados en el array: ${[...new Set(nombresDuplicados)].join(', ')}`,
+      );
+    }
+
+    try {
+      const existentes = await this.prisma.producto.findMany({
+        where: { nombre: { in: nombres } },
+      });
+
+      if (existentes.length > 0) {
+        const nombresExistentes = existentes.map((p) => p.nombre).join(', ');
+        throw new ConflictException(
+          `Los siguientes productos ya existen: ${nombresExistentes}`,
+        );
+      }
+
+      const nuevos = await this.prisma.producto.createMany({
+        data: productos,
+        skipDuplicates: true,
+      });
+
+      this.logger.log(`Se crearon ${nuevos.count} productos en batch`);
+      return {
+        message: `Se crearon ${nuevos.count} productos correctamente.`,
+        total: nuevos.count,
+      };
+    } catch (error) {
+      handlePrismaError(error, 'Productos');
+    }
+  }
+
   async update(
     id: bigint,
     actualizarProductoDto: ActualizarProductoDto,
@@ -144,6 +206,13 @@ export class ProductosService {
       if (!existe)
         throw new NotFoundException(`Producto con ID ${id} no encontrado`);
 
+      // ✅ VALIDACIÓN: No desactivar producto ya desactivado
+      if (!existe.activo) {
+        throw new BadRequestException(
+          `El producto '${existe.nombre}' ya está desactivado`,
+        );
+      }
+
       const producto = await this.prisma.producto.update({
         where: { id },
         data: { activo: false },
@@ -160,7 +229,7 @@ export class ProductosService {
     pagina: number = 1,
     limite: number = 10,
     buscar?: string,
-  ): Promise<PaginacionResultado<SerializedProducto>> {
+  ): Promise<PaginacionResultado<SerializedProducto> | { message: string }> {
     const maxPageSize = this.configService.get<number>('MAX_PAGE_SIZE', 50);
 
     const normalize = (val: number, min: number, max: number) =>
@@ -172,7 +241,7 @@ export class ProductosService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProductoWhereInput = {
-      activo: true,
+      activo: false,
       ...(buscar
         ? {
             nombre: {
@@ -193,14 +262,23 @@ export class ProductosService {
       this.prisma.producto.count({ where }),
     ]);
 
+    // ✅ VALIDACIÓN: Si no hay productos inactivos
+    if (total === 0) {
+      return {
+        message: buscar
+          ? `No se encontraron productos inactivos que coincidan con "${buscar}"`
+          : 'No hay productos inactivos en este momento',
+      };
+    }
+
     const serializedProductos = serializedBigInt(
       productos,
     ) as SerializedProducto[];
 
     return {
       total,
-      pagina: page,
       limite: limit,
+      pagina: page,
       totalPaginas: Math.ceil(total / limit),
       datos: serializedProductos,
     } satisfies PaginacionResultado<SerializedProducto>;
@@ -211,6 +289,14 @@ export class ProductosService {
       const existe = await this.prisma.producto.findUnique({ where: { id } });
       if (!existe)
         throw new NotFoundException(`Producto con ID ${id} no encontrado`);
+
+      // ✅ VALIDACIÓN: No restaurar producto ya activo
+      if (existe.activo) {
+        throw new BadRequestException(
+          `El producto '${existe.nombre}' ya está activo`,
+        );
+      }
+
       this.logger.log(`Producto ${id} restaurado`);
       const producto = await this.prisma.producto.update({
         where: { id },
