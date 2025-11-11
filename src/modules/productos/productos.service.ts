@@ -14,12 +14,14 @@ import { CrearProductoDto } from './dto/crear-productos.dto';
 import { handlePrismaError } from '../../utils/handle-prisma-error';
 import { PaginacionResultado } from 'src/types/paginacion.types';
 import { Prisma } from '@prisma/client';
+import { NotificacionTelegramService } from '../telegram/telegram.service';
 
 @Injectable()
 export class ProductosService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private notificacionService: NotificacionTelegramService,
   ) {}
 
   // Constantes para evitar "números mágicos"
@@ -307,4 +309,108 @@ export class ProductosService {
       handlePrismaError(error, 'Producto');
     }
   }
+
+  // Disminuir stock (por venta)
+  async reducirStock(
+    id: bigint,
+    cantidad: number,
+  ): Promise<SerializedProducto> {
+    const producto = await this.prisma.producto.findUnique({ where: { id } });
+    if (!producto) throw new NotFoundException(`Producto ${id} no encontrado`);
+
+    if (cantidad <= 0) {
+      throw new BadRequestException(
+        'La cantidad a reducir debe ser mayor que 0.',
+      );
+    }
+
+    if (producto.stock < cantidad) {
+      throw new BadRequestException(
+        `Solo hay ${producto.stock} unidades disponibles de '${producto.nombre}'.`,
+      );
+    }
+
+    const nuevoStock = producto.stock - cantidad;
+
+    const actualizado = await this.prisma.producto.update({
+      where: { id },
+      data: { stock: nuevoStock },
+    });
+
+    // Notificaciones automáticas
+    if (nuevoStock === 0) {
+      await this.notificacionService.enviarMensaje(
+        `🚨 Producto '${producto.nombre}' se ha quedado SIN stock (0 unidades restantes).`,
+      );
+    } else if (nuevoStock <= producto.stockMinimo) {
+      await this.notificacionService.enviarMensaje(
+        `⚠️ Stock bajo: '${producto.nombre}' (${nuevoStock}/${producto.stockMinimo}).`,
+      );
+    }
+
+    return serializedBigInt(actualizado) as SerializedProducto;
+  }
+
+  async aumentarStock(
+    id: bigint,
+    cantidad: number,
+  ): Promise<SerializedProducto> {
+    if (cantidad <= 0) {
+      throw new BadRequestException(
+        'La cantidad a aumentar debe ser mayor que 0.',
+      );
+    }
+
+    const producto = await this.prisma.producto.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!producto) {
+      throw new NotFoundException(`Producto con ID ${id} no encontrado.`);
+    }
+
+    const stockActual = Number(producto.stock);
+    const cantidadNum = Number(cantidad);
+
+    if (isNaN(stockActual) || isNaN(cantidadNum)) {
+      throw new BadRequestException('Valores inválidos para stock o cantidad.');
+    }
+
+    const nuevoStock = stockActual + cantidadNum;
+
+    console.log({ id, cantidadNum, stockActual, nuevoStock }); // 👈 DEBUG
+    console.log({
+      id,
+      cantidad,
+      stockActual,
+      nuevoStock,
+      tipo: typeof nuevoStock,
+    });
+
+    const actualizado = await this.prisma.producto.update({
+      where: { id: Number(id) },
+      data: { stock: Math.floor(nuevoStock) }, // 👈 Asegura entero válido
+    });
+
+    this.logger.log(
+      `🟢 Stock de '${producto.nombre}' aumentado a ${nuevoStock}.`,
+    );
+
+    if (
+      stockActual <= producto.stockMinimo &&
+      nuevoStock > producto.stockMinimo
+    ) {
+      await this.notificacionService.enviarMensaje(
+        `✅ Producto '${producto.nombre}' ha sido repuesto. Nuevo stock: ${nuevoStock} unidades.`,
+      );
+    }
+
+    return serializedBigInt(actualizado) as SerializedProducto;
+  }
+
+  // async testTelegram(): Promise<void> {
+  //   await this.notificacionService.enviarMensaje(
+  //     '✅ Test de conexión con Telegram funcionando correctamente.',
+  //   );
+  // }
 }
