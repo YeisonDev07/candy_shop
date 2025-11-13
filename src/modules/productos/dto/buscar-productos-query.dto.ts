@@ -39,9 +39,14 @@ export class BuscarProductosQueryDto {
   activo?: boolean;
 
   @IsOptional()
-  @IsIn(['nombre', 'precio', 'stock', 'createdAt', 'updatedAt'])
-  ordenarPor?: 'nombre' | 'precio' | 'stock' | 'createdAt' | 'updatedAt' =
-    'nombre';
+  @IsIn(['id', 'nombre', 'precio', 'stock', 'createdAt', 'updatedAt'])
+  ordenarPor?:
+    | 'id'
+    | 'nombre'
+    | 'precio'
+    | 'stock'
+    | 'createdAt'
+    | 'updatedAt' = 'nombre';
 
   @IsOptional()
   @IsIn(['asc', 'desc'])

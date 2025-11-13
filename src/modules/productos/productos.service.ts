@@ -38,6 +38,7 @@ export class ProductosService {
     buscarPorNombre?: string,
     activo?: boolean,
     ordenarPor:
+      | 'id'
       | 'nombre'
       | 'precio'
       | 'stock'
@@ -56,7 +57,7 @@ export class ProductosService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProductoWhereInput = {
-      ...(typeof activo === 'boolean' ? { activo } : {}), // si no se envía, no filtra por activo
+      ...(typeof activo === 'boolean' ? { activo } : { activo: true }),
       ...(buscarPorNombre
         ? {
             nombre: {
@@ -118,24 +119,21 @@ export class ProductosService {
   async create(
     crearProductoDto: CrearProductoDto,
   ): Promise<SerializedProducto> {
-    try {
-      const existe = await this.prisma.producto.findFirst({
-        where: { nombre: crearProductoDto.nombre },
-      });
-      if (existe) {
-        throw new ConflictException(
-          `El producto '${crearProductoDto.nombre}' ya existe.`,
-        );
-      }
+    const existe = await this.prisma.producto.findFirst({
+      where: { nombre: crearProductoDto.nombre },
+    });
 
-      const producto = await this.prisma.producto.create({
-        data: crearProductoDto,
-      });
-
-      return serializedBigInt(producto) as SerializedProducto;
-    } catch (error: any) {
-      handlePrismaError(error, 'Producto');
+    if (existe) {
+      throw new ConflictException(
+        `El producto '${crearProductoDto.nombre}' ya existe.`,
+      );
     }
+
+    const producto = await this.prisma.producto.create({
+      data: crearProductoDto,
+    });
+
+    return serializedBigInt(producto) as SerializedProducto;
   }
 
   async createMany(
@@ -164,108 +162,95 @@ export class ProductosService {
       );
     }
 
-    try {
-      const existentes = await this.prisma.producto.findMany({
-        where: { nombre: { in: nombres } },
-      });
+    const existentes = await this.prisma.producto.findMany({
+      where: { nombre: { in: nombres } },
+    });
 
-      if (existentes.length > 0) {
-        const nombresExistentes = existentes.map((p) => p.nombre).join(', ');
-        throw new ConflictException(
-          `Los siguientes productos ya existen: ${nombresExistentes}`,
-        );
-      }
-
-      const nuevos = await this.prisma.producto.createMany({
-        data: productos,
-        skipDuplicates: true,
-      });
-
-      this.logger.log(`Se crearon ${nuevos.count} productos en batch`);
-      return {
-        message: `Se crearon ${nuevos.count} productos correctamente.`,
-        total: nuevos.count,
-      };
-    } catch (error) {
-      handlePrismaError(error, 'Productos');
+    if (existentes.length > 0) {
+      const nombresExistentes = existentes.map((p) => p.nombre).join(', ');
+      throw new ConflictException(
+        `Los siguientes productos ya existen: ${nombresExistentes}`,
+      );
     }
+
+    const nuevos = await this.prisma.producto.createMany({
+      data: productos,
+      skipDuplicates: true,
+    });
+
+    this.logger.log(`Se crearon ${nuevos.count} productos en batch`);
+    return {
+      message: `Se crearon ${nuevos.count} productos correctamente.`,
+      total: nuevos.count,
+    };
   }
 
   async update(
     id: bigint,
     actualizarProductoDto: ActualizarProductoDto,
   ): Promise<SerializedProducto> {
-    try {
-      const existe = await this.prisma.producto.findUnique({ where: { id } });
-      if (!existe)
-        throw new NotFoundException(`Producto con ID ${id} no encontrado`);
-      if (
-        'stock' in actualizarProductoDto ||
-        'stockMinimo' in actualizarProductoDto
-      ) {
-        throw new BadRequestException(
-          'No está permitido actualizar el stock directamente desde este endpoint. Usa /aumentar-stock o /reducir-stock.',
-        );
-      }
+    const existe = await this.prisma.producto.findUnique({ where: { id } });
 
-      const productoActualizado = await this.prisma.producto.update({
-        where: { id },
-        data: actualizarProductoDto,
-      });
-
-      return serializedBigInt(productoActualizado) as SerializedProducto;
-    } catch (error: any) {
-      handlePrismaError(error, 'Producto');
+    if (!existe) {
+      throw new NotFoundException(`Producto con ID ${id} no encontrado`);
     }
+
+    if (
+      'stock' in actualizarProductoDto ||
+      'stockMinimo' in actualizarProductoDto
+    ) {
+      throw new BadRequestException(
+        'No está permitido actualizar el stock directamente desde este endpoint. Usa /aumentar-stock o /reducir-stock.',
+      );
+    }
+
+    const productoActualizado = await this.prisma.producto.update({
+      where: { id },
+      data: actualizarProductoDto,
+    });
+
+    return serializedBigInt(productoActualizado) as SerializedProducto;
   }
 
   async remove(id: bigint): Promise<SerializedProducto> {
-    try {
-      const existe = await this.prisma.producto.findUnique({ where: { id } });
-      if (!existe)
-        throw new NotFoundException(`Producto con ID ${id} no encontrado`);
+    const existe = await this.prisma.producto.findUnique({ where: { id } });
+    if (!existe)
+      throw new NotFoundException(`Producto con ID ${id} no encontrado`);
 
-      // ✅ VALIDACIÓN: No desactivar producto ya desactivado
-      if (!existe.activo) {
-        throw new BadRequestException(
-          `El producto '${existe.nombre}' ya está desactivado`,
-        );
-      }
-
-      const producto = await this.prisma.producto.update({
-        where: { id },
-        data: { activo: false },
-      });
-      this.logger.log(`Producto ${id} eliminado`);
-
-      return serializedBigInt(producto) as SerializedProducto;
-    } catch (error: any) {
-      handlePrismaError(error, 'Producto');
+    // ✅ VALIDACIÓN: No desactivar producto ya desactivado
+    if (!existe.activo) {
+      throw new BadRequestException(
+        `El producto '${existe.nombre}' ya está desactivado`,
+      );
     }
+
+    const producto = await this.prisma.producto.update({
+      where: { id },
+      data: { activo: false },
+    });
+    this.logger.log(`Producto ${id} eliminado`);
+
+    return serializedBigInt(producto) as SerializedProducto;
   }
 
   async restore(id: bigint): Promise<SerializedProducto> {
-    try {
-      const existe = await this.prisma.producto.findUnique({ where: { id } });
-      if (!existe)
-        throw new NotFoundException(`Producto con ID ${id} no encontrado`);
+    const existe = await this.prisma.producto.findUnique({ where: { id } });
+    if (!existe)
+      throw new NotFoundException(`Producto con ID ${id} no encontrado`);
 
-      // ✅ VALIDACIÓN: No restaurar producto ya activo
-      if (existe.activo) {
-        throw new BadRequestException(
-          `El producto '${existe.nombre}' ya está activo`,
-        );
-      }
-
-      this.logger.log(`Producto ${id} restaurado`);
-      const producto = await this.prisma.producto.update({
-        where: { id },
-        data: { activo: true },
-      });
-      return serializedBigInt(producto) as SerializedProducto;
-    } catch (error) {
-      handlePrismaError(error, 'Producto');
+    // ✅ VALIDACIÓN: No restaurar producto ya activo
+    if (existe.activo) {
+      throw new BadRequestException(
+        `El producto '${existe.nombre}' ya está activo`,
+      );
     }
+
+    this.logger.log(`Producto ${id} restaurado`);
+    const producto = await this.prisma.producto.update({
+      where: { id },
+      data: { activo: true },
+    });
+    return serializedBigInt(producto) as SerializedProducto;
   }
 
   // Disminuir stock (por venta)
@@ -336,7 +321,9 @@ export class ProductosService {
 
     const nuevoStock = stockActual + cantidadNum;
 
-    console.log({ id, cantidadNum, stockActual, nuevoStock }); // 👈 DEBUG
+    this.logger.debug(
+      `Stock actualizado para producto ${id}: ${stockActual} → ${nuevoStock}`,
+    );
     console.log({
       id,
       cantidad,
