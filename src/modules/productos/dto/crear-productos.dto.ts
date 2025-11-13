@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsString,
   IsOptional,
@@ -17,6 +18,7 @@ export class CrearProductoDto {
   @IsString({ message: 'La descripción debe ser una cadena de texto.' })
   descripcion?: string;
 
+  @Transform(({ value }) => Number(value))
   @IsNumber({}, { message: 'El precio debe ser un número válido.' })
   @Min(1, { message: 'El precio no puede ser negativo.' })
   precio: number;

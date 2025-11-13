@@ -6,6 +6,8 @@ import {
   MinLength,
   Max,
   Min,
+  IsIn,
+  IsBoolean,
 } from 'class-validator';
 
 export class BuscarProductosQueryDto {
@@ -30,4 +32,18 @@ export class BuscarProductosQueryDto {
   })
   @Transform(({ value }) => value?.trim())
   buscarPorNombre?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  activo?: boolean;
+
+  @IsOptional()
+  @IsIn(['nombre', 'precio', 'stock', 'createdAt', 'updatedAt'])
+  ordenarPor?: 'nombre' | 'precio' | 'stock' | 'createdAt' | 'updatedAt' =
+    'nombre';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  orden?: 'asc' | 'desc' = 'asc';
 }

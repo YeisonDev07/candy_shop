@@ -24,14 +24,23 @@ export class ProductosController {
 
   @Get()
   async findAll(@Query() queryDto: BuscarProductosQueryDto) {
-    const { pagina = 1, limite = 10, buscarPorNombre } = queryDto;
-    return this.productosService.findAll(pagina, limite, buscarPorNombre);
-  }
+    const {
+      pagina = 1,
+      limite = 10,
+      buscarPorNombre,
+      activo,
+      ordenarPor = 'nombre',
+      orden = 'asc',
+    } = queryDto;
 
-  @Get('inactivos')
-  async findInactive(@Query() queryDto: BuscarProductosQueryDto) {
-    const { pagina = 1, limite = 10, buscarPorNombre } = queryDto;
-    return this.productosService.findInactivos(pagina, limite, buscarPorNombre);
+    return this.productosService.findAll(
+      pagina,
+      limite,
+      buscarPorNombre,
+      activo,
+      ordenarPor,
+      orden,
+    );
   }
 
   @Get(':id')

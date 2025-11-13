@@ -36,6 +36,14 @@ export class ProductosService {
     pagina: number = 1,
     limite: number = 10,
     buscarPorNombre?: string,
+    activo?: boolean,
+    ordenarPor:
+      | 'nombre'
+      | 'precio'
+      | 'stock'
+      | 'createdAt'
+      | 'updatedAt' = 'nombre',
+    orden: 'asc' | 'desc' = 'asc',
   ): Promise<PaginacionResultado<SerializedProducto> | { message: string }> {
     const maxPageSize = this.configService.get<number>('MAX_PAGE_SIZE', 50);
 
@@ -48,12 +56,12 @@ export class ProductosService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProductoWhereInput = {
-      activo: true,
+      ...(typeof activo === 'boolean' ? { activo } : {}), // si no se envía, no filtra por activo
       ...(buscarPorNombre
         ? {
             nombre: {
               contains: buscarPorNombre,
-              mode: Prisma.QueryMode.insensitive, // Búsqueda insensible a mayúsculas/minúsculas
+              mode: Prisma.QueryMode.insensitive, // búsqueda case-insensitive
             },
           }
         : {}),
@@ -64,7 +72,7 @@ export class ProductosService {
         where,
         skip,
         take: limit,
-        orderBy: { id: 'asc' },
+        orderBy: { [ordenarPor]: orden }, // ← dinámico según el DTO
       }),
       this.prisma.producto.count({ where }),
     ]);
@@ -236,65 +244,6 @@ export class ProductosService {
     }
   }
 
-  async findInactivos(
-    pagina: number = 1,
-    limite: number = 10,
-    buscar?: string,
-  ): Promise<PaginacionResultado<SerializedProducto> | { message: string }> {
-    const maxPageSize = this.configService.get<number>('MAX_PAGE_SIZE', 50);
-
-    const normalize = (val: number, min: number, max: number) =>
-      Math.max(min, Math.min(Number(val) || min, max));
-
-    const page = normalize(pagina, this.MIN_PAGE_NUMBER, this.MAX_PAGE_NUMBER);
-    const limit = normalize(limite, this.MIN_PAGE_NUMBER, maxPageSize);
-
-    const skip = (page - 1) * limit;
-
-    const where: Prisma.ProductoWhereInput = {
-      activo: false,
-      ...(buscar
-        ? {
-            nombre: {
-              contains: buscar,
-              mode: Prisma.QueryMode.insensitive, // Búsqueda insensible a mayúsculas/minúsculas
-            },
-          }
-        : {}),
-    };
-
-    const [productos, total] = await Promise.all([
-      this.prisma.producto.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { id: 'asc' },
-      }),
-      this.prisma.producto.count({ where }),
-    ]);
-
-    // ✅ VALIDACIÓN: Si no hay productos inactivos
-    if (total === 0) {
-      return {
-        message: buscar
-          ? `No se encontraron productos inactivos que coincidan con "${buscar}"`
-          : 'No hay productos inactivos en este momento',
-      };
-    }
-
-    const serializedProductos = serializedBigInt(
-      productos,
-    ) as SerializedProducto[];
-
-    return {
-      total,
-      limite: limit,
-      pagina: page,
-      totalPaginas: Math.ceil(total / limit),
-      datos: serializedProductos,
-    } satisfies PaginacionResultado<SerializedProducto>;
-  }
-
   async restore(id: bigint): Promise<SerializedProducto> {
     try {
       const existe = await this.prisma.producto.findUnique({ where: { id } });
@@ -416,5 +365,4 @@ export class ProductosService {
 
     return serializedBigInt(actualizado) as SerializedProducto;
   }
-
 }
