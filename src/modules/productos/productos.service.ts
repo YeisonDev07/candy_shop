@@ -190,6 +190,14 @@ export class ProductosService {
       const existe = await this.prisma.producto.findUnique({ where: { id } });
       if (!existe)
         throw new NotFoundException(`Producto con ID ${id} no encontrado`);
+      if (
+        'stock' in actualizarProductoDto ||
+        'stockMinimo' in actualizarProductoDto
+      ) {
+        throw new BadRequestException(
+          'No está permitido actualizar el stock directamente desde este endpoint. Usa /aumentar-stock o /reducir-stock.',
+        );
+      }
 
       const productoActualizado = await this.prisma.producto.update({
         where: { id },
