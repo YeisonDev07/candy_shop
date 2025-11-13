@@ -24,21 +24,15 @@ export class ProductosController {
 
   @Get()
   async findAll(@Query() queryDto: BuscarProductosQueryDto) {
-    const { pagina = 1, limite = 10, buscar } = queryDto;
-    return this.productosService.findAll(pagina, limite, buscar);
+    const { pagina = 1, limite = 10, buscarPorNombre } = queryDto;
+    return this.productosService.findAll(pagina, limite, buscarPorNombre);
   }
 
   @Get('inactivos')
   async findInactive(@Query() queryDto: BuscarProductosQueryDto) {
-    const { pagina = 1, limite = 10, buscar } = queryDto;
-    return this.productosService.findInactivos(pagina, limite, buscar);
+    const { pagina = 1, limite = 10, buscarPorNombre } = queryDto;
+    return this.productosService.findInactivos(pagina, limite, buscarPorNombre);
   }
-
-  // @Get('test-telegram')
-  // async testTelegram(): Promise<{ message: string }> {
-  //   await this.productosService.testTelegram();
-  //   return { message: 'Mensaje de prueba enviado a Telegram' };
-  // }
 
   @Get(':id')
   async findOne(@Param('id', ParseBigIntPipe) id: bigint) {

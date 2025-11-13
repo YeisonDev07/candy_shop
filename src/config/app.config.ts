@@ -1,4 +1,4 @@
-// Este archivo Define valores globales de la aplicación
+// Este archivo define valores globales de la aplicación
 
 import { registerAs } from '@nestjs/config';
 

@@ -25,6 +25,7 @@ export class ProductosService {
   ) {}
 
   // Constantes para evitar "números mágicos"
+  // Limite del número de página permitido.
   private readonly MAX_PAGE_NUMBER = 100;
   private readonly MIN_PAGE_NUMBER = 1;
 
@@ -34,7 +35,7 @@ export class ProductosService {
   async findAll(
     pagina: number = 1,
     limite: number = 10,
-    buscar?: string,
+    buscarPorNombre?: string,
   ): Promise<PaginacionResultado<SerializedProducto> | { message: string }> {
     const maxPageSize = this.configService.get<number>('MAX_PAGE_SIZE', 50);
 
@@ -48,10 +49,10 @@ export class ProductosService {
 
     const where: Prisma.ProductoWhereInput = {
       activo: true,
-      ...(buscar
+      ...(buscarPorNombre
         ? {
             nombre: {
-              contains: buscar,
+              contains: buscarPorNombre,
               mode: Prisma.QueryMode.insensitive, // Búsqueda insensible a mayúsculas/minúsculas
             },
           }
@@ -71,8 +72,8 @@ export class ProductosService {
     // ✅ VALIDACIÓN: Si no hay productos
     if (total === 0) {
       return {
-        message: buscar
-          ? `No se encontraron productos que coincidan con "${buscar}"`
+        message: buscarPorNombre
+          ? `No se encontraron productos que coincidan con "${buscarPorNombre}"`
           : 'No hay productos disponibles en este momento',
       };
     }
@@ -416,9 +417,4 @@ export class ProductosService {
     return serializedBigInt(actualizado) as SerializedProducto;
   }
 
-  // async testTelegram(): Promise<void> {
-  //   await this.notificacionService.enviarMensaje(
-  //     '✅ Test de conexión con Telegram funcionando correctamente.',
-  //   );
-  // }
 }

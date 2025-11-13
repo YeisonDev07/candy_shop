@@ -29,5 +29,5 @@ export class BuscarProductosQueryDto {
     message: 'El término de búsqueda debe tener al menos 2 caracteres',
   })
   @Transform(({ value }) => value?.trim())
-  buscar?: string;
+  buscarPorNombre?: string;
 }
